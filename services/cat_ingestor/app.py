@@ -1,36 +1,33 @@
 import paho.mqtt.client as mqtt
 import sys
-import argparse
 import json
+import os
 from sensor_logs import SensorLogsDB
 
-# argumentos e menu de ajuda
-parser = argparse.ArgumentParser(
-    description="Script para persistência dos dados dos sensores",
-    add_help=False
-)
-parser.add_argument('-h', '--help', action='help', help='Mostra essa mensagem de ajuda')
-parser.add_argument('-b', '--broker', type=str, help='Endereço do broker MQTT')
-parser.add_argument('-p', '--port', type=int, default=1883, help='Porta do broker MQTT (padrão 1883)')
+MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "localhost")
+MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", 1883))
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "sensores/nodes/#")
+MQTT_CLIENT_ID = "cat_ingestor_app"
 
-# carrega os argumentos para conectar ao MQTT (IP varia, porta provavelmente não)
-args = parser.parse_args()
+DB_PARAMS = {
+    'dbname': os.getenv("POSTGRES_DB"),
+    'user': os.getenv("POSTGRES_USER"),
+    'password': os.getenv("POSTGRES_PASSWORD"),
+    'host': os.getenv("POSTGRES_HOST", "localhost")
+}
 
 # conecta ao banco de dados
-db = SensorLogsDB()
+db = SensorLogsDB(DB_PARAMS)
 
 def main():
-    broker = args.broker
-    port = args.port
-
     db.create_table()
 
-    client = mqtt.Client(client_id="cat_ingestor_app")
+    client = mqtt.Client(client_id=MQTT_CLIENT_ID)
     client.on_connect = on_connect
     client.on_message = on_message
 
     try:
-        client.connect(broker, port, 60)
+        client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, 60)
     except Exception as e:
         print(f"Erro ao conectar ao broker MQTT: {e}")
         db.close()
@@ -56,14 +53,13 @@ def on_message(client, userdata, message):
     except Exception:
         mqtt_message_json = {"raw": mqtt_message_str} # não deveria haver problema com formatação, mas caso haja...
     
-    db.insert_log(message.topic, mqtt_message_json)
+    db.insert_log(message.topic, json.dumps(mqtt_message_json))
     print(f"Recebido no tópico '{message.topic}': {mqtt_message_str}")
 
 def on_connect(client, userdata, flags, rc):
-    topic = "sensores/nodes/#"
     if rc == 0:
         print("Conectado ao Broker!")
-        client.subscribe(topic)
+        client.subscribe(MQTT_TOPIC)
     else:
         print(f"Falha na conexão, código {rc}")
 
