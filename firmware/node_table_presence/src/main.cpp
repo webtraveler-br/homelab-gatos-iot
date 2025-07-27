@@ -10,6 +10,7 @@ PubSubClient client(espClient);
 JsonDocument doc;
 
 const char* node_name = "node_table_presence";
+
 const int pin_heat_sensor = 27;
 
 char mqtt_server[40] = "";
@@ -17,18 +18,18 @@ char mqtt_server[40] = "";
 const char* mqtt_topic_publish = "sensores/nodes/table_presence";
 const int mqtt_port = 1883;
 
-int detected = 0;
+bool detected = false;
 long lastMsg = 0;
 
 void reconnect();
-void publish(int);
+void publish(bool);
 
 void setup() {
     Serial.begin(115200);
     pinMode(pin_heat_sensor, INPUT);
 
     // Descomente a linha abaixo para forçar a aparição do portal de configuração.
-	// wm.resetSettings();
+    // wm.resetSettings();
 
     // Adiciona um campo novo ao wifi manager, permitindo configurar o IP do MQTT
     WiFiManagerParameter custom_mqtt_server("server", "MQTT Server IP", mqtt_server, 40);
@@ -54,12 +55,12 @@ void setup() {
 }
 
 void loop() {
-    int sensor_value = digitalRead(pin_heat_sensor);
+    bool sensor_value = digitalRead(pin_heat_sensor) == HIGH;
     long now = millis();
 
-    if (sensor_value == HIGH && detected == LOW) {
+    if (sensor_value && !detected) {
         Serial.println("Detectado!");
-    } else if (sensor_value == LOW && detected == HIGH) {
+    } else if (!sensor_value && detected) {
         Serial.println("Nenhuma leitura.");
     }
 
@@ -95,7 +96,7 @@ void reconnect() {
     }
 }
 
-void publish(int presence) {
+void publish(bool presence) {
     String msg;
     doc["presence"] = presence;
     serializeJson(doc, msg);
