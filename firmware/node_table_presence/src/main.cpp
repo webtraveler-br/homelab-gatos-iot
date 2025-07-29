@@ -56,26 +56,22 @@ void setup() {
 
 void loop() {
     bool sensor_value = digitalRead(pin_heat_sensor) == HIGH;
-    long now = millis();
 
-    if (sensor_value && !detected) {
-        Serial.println("Detectado!");
-    } else if (!sensor_value && detected) {
-        Serial.println("Nenhuma leitura.");
+    // Publica mensagem apenas quando o valor de presença mudar
+    if (sensor_value != detected) {
+        detected = sensor_value;
+        publish(detected);
+        if (detected) {
+            Serial.println("Detectado!");
+        } else {
+            Serial.println("Nenhuma leitura.");
+        }
     }
-
-    detected = sensor_value;
 
     if (!client.connected()) {
         reconnect();
     }
     client.loop();
-
-    // Lógica para enviar uma mensagem a cada 10 segundos (sem usar delay)
-    if (now - lastMsg > 10000) {
-        lastMsg = now;
-        publish(detected);
-    }
 }
 
 // Função para reconectar ao broker se a conexão cair
