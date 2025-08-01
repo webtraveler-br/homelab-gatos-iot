@@ -1,0 +1,4 @@
+.vscode
+firmware/node_*/.pio/
+firmware/node_*/.vscode/
+firmware/node_*/.gitignore
