@@ -1,103 +1,40 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include <WiFiManager.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
+#include "SensorCommunication.h"
 
-WiFiClient espClient;
-WiFiManager wm;
-PubSubClient client(espClient);
-JsonDocument doc;
+#define NODE_NAME "node_table_presence"
 
-const char* node_name = "node_table_presence";
+#define MQTT_TOPIC "sensores/nodes/table_presence"
+#define MQTT_PORT 1883
 
-const int pin_heat_sensor = 27;
-
-char mqtt_server[40] = "";
-
-const char* mqtt_topic_publish = "sensores/nodes/table_presence";
-const int mqtt_port = 1883;
+#define PIN_HEAT_SENSOR 27
 
 bool detected = false;
-long lastMsg = 0;
 
-void reconnect();
-void publish(bool);
+JsonDocument doc;
+SensorCommunication communication(NODE_NAME);
 
 void setup() {
     Serial.begin(115200);
-    pinMode(pin_heat_sensor, INPUT);
+    pinMode(PIN_HEAT_SENSOR, INPUT);
 
-    // Descomente a linha abaixo para forçar a aparição do portal de configuração.
-    // wm.resetSettings();
-
-    // Adiciona um campo novo ao wifi manager, permitindo configurar o IP do MQTT
-    WiFiManagerParameter custom_mqtt_server("server", "MQTT Server IP", mqtt_server, 40);
-    wm.addParameter(&custom_mqtt_server);
-
-    // Se o usuário não configurar em 10 minutos, o ESP reinicia.
-    wm.setConfigPortalTimeout(600);
-
-    if (!wm.autoConnect(node_name)) {
-        Serial.println("Tempo limite atingido. Reiniciando...");
-        ESP.restart();
-    } else {
-        Serial.println("Conectado!");
-        Serial.print("Endereço IP: ");
-        Serial.println(WiFi.localIP());
-    }
-
-    strcpy(mqtt_server, custom_mqtt_server.getValue());
-    Serial.print("MQTT Server IP set to: ");
-    Serial.println(mqtt_server);
-
-    client.setServer(mqtt_server, mqtt_port);
+    communication.setup_wifi(true);
+    communication.setup_mqtt(MQTT_TOPIC, MQTT_PORT);
 }
 
 void loop() {
-    bool sensor_value = digitalRead(pin_heat_sensor) == HIGH;
+    communication.loop();
+    
+    bool sensor_value = digitalRead(PIN_HEAT_SENSOR) == HIGH;
 
     // Publica mensagem apenas quando o valor de presença mudar
     if (sensor_value != detected) {
         detected = sensor_value;
-        publish(detected);
-        if (detected) {
-            Serial.println("Detectado!");
+        doc["presence"] = detected;
+        
+        if (communication.publish(doc)) {
+            Serial.println(detected ? "Detectado!" : "Nenhuma leitura.");
         } else {
-            Serial.println("Nenhuma leitura.");
+            Serial.println("Falha ao enviar mensagem.");
         }
     }
-
-    if (!client.connected()) {
-        reconnect();
-    }
-    client.loop();
-}
-
-// Função para reconectar ao broker se a conexão cair
-void reconnect() {
-    while (!client.connected()) {
-        Serial.print("Tentando conectar ao broker ");
-        Serial.print(mqtt_server);
-        Serial.print("...");
-
-        if (client.connect(node_name)) {
-            Serial.println("Conectado!");
-        } else {
-            Serial.print("falhou, rc=");
-            Serial.print(client.state());
-            Serial.println("tentando novamente em 5 segundos");
-            delay(5000);
-        }
-    }
-}
-
-void publish(bool presence) {
-    String msg;
-    doc["presence"] = presence;
-    serializeJson(doc, msg);
-
-    Serial.print("Publicando mensagem: ");
-    Serial.println(msg);
-    client.publish(mqtt_topic_publish, msg.c_str()); // necessário transformar em string padrão
 }
