@@ -31,11 +31,13 @@ class MQTTClient:
         self.client = mqtt.Client(client_id=client_id, userdata=self.userdata)
         self.client.on_connect = self._on_connect
         self.client.on_message = self.on_message
+        
+        self.silent_reconnection = False
 
     # Callback executado quando o cliente conecta ao broker MQTT.
     def _on_connect(self, client: mqtt.Client, userdata: Any, flags: Dict[str, Any], rc: int) -> None:
         if rc == 0:
-            self.logger.info("Conectado ao Broker!")
+            self.connection_log("Conectado ao Broker!")
             client.subscribe(self.topic)
         else:
             self.logger.error(f"Falha na conexão com Broker, código {rc}")
@@ -48,6 +50,7 @@ class MQTTClient:
 
             # timer necessário para shutdown
             if timeout is not None:
+                self.silent_reconnection = True
                 t = threading.Timer(timeout, self.disconnect)
                 t.start()
                 self.client.loop_forever()
@@ -64,6 +67,11 @@ class MQTTClient:
     def disconnect(self) -> None:
         try:
             self.client.disconnect()
-            self.logger.info("Desconectado do broker MQTT")
+            self.connection_log("Desconectado do broker MQTT")
         except Exception as e:
             self.logger.error(f"Erro ao desconectar do broker MQTT: {e}", exc_info=True)
+
+    def connection_log(self, msg: str) -> None:
+        if self.silent_reconnection:
+            return
+        self.logger.info(msg)
