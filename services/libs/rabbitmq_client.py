@@ -5,6 +5,7 @@ from typing import Optional, Callable, Any, Union
 from functools import partial
 import json
 import threading
+import time
 
 
 # Esta classe encapsula a lógica de conexão e publicação de mensagens no RabbitMQ.
@@ -62,41 +63,58 @@ class RabbitMQClient:
             if connection and getattr(connection, "is_open", False):
                 connection.close()
 
-    # Escuta mensagens de uma fila e executa uma função callback para cada mensagem recebida.
+    # Escuta mensagens de uma fila e executa uma função callback para cada mensagem recebida. Faz 10 tentativas de conexão por padrão.
     # on_message_callback: função que recebe os parâmetros (channel, method, properties, body).
     def consume(
-        self, queue: str, on_message_callback: Union[Callable[..., Any], partial], timeout: Optional[int] = None
+        self,
+        queue: str,
+        on_message_callback: Union[Callable[..., Any], partial],
+        timeout: Optional[int] = None,
+        retries: int = 10,
+        delay: int = 5,
     ) -> None:
-        try:
-            self.connection = pika.BlockingConnection(
-                pika.ConnectionParameters(
-                    host=self.rabbitmq_host, port=int(self.rabbitmq_port), credentials=self.credentials
+        attempt = 0
+        while attempt < retries:
+            try:
+                self.connection = pika.BlockingConnection(
+                    pika.ConnectionParameters(
+                        host=self.rabbitmq_host, port=int(self.rabbitmq_port), credentials=self.credentials
+                    )
                 )
-            )
-            channel = self.connection.channel()
-            channel.queue_declare(queue=queue, durable=True)
-            self.logger.info(f"Escutando fila '{queue}'...")
+                channel = self.connection.channel()
+                channel.queue_declare(queue=queue, durable=True)
+                self.logger.info(f"Escutando fila '{queue}'...")
 
-            channel.basic_consume(queue=queue, on_message_callback=on_message_callback, auto_ack=True)
+                channel.basic_consume(queue=queue, on_message_callback=on_message_callback, auto_ack=True)
 
-            # timer necessário para shutdown
-            if timeout is not None:
-                t = threading.Timer(timeout, self.stop, args=(channel,))
-                t.start()
-                channel.start_consuming()
-                t.cancel()
-            else:
-                channel.start_consuming()
-        except AMQPConnectionError as conn_err:
-            self.logger.error(f"Erro de conexão com RabbitMQ: {conn_err}", exc_info=True)
-        except ChannelError as chan_err:
-            self.logger.error(f"Erro no canal RabbitMQ: {chan_err}", exc_info=True)
-        except AMQPError as amqp_err:
-            self.logger.error(f"Erro AMQP no RabbitMQ: {amqp_err}", exc_info=True)
-        except Exception as e:
-            self.logger.error(f"Erro inesperado ao consumir fila RabbitMQ: {e}", exc_info=True)
-        finally:
-            self.close_connection()
+                # timer necessário para shutdown
+                if timeout is not None:
+                    t = threading.Timer(timeout, self.stop, args=(channel,))
+                    t.start()
+                    channel.start_consuming()
+                    t.cancel()
+                else:
+                    channel.start_consuming()
+                break 
+            except AMQPConnectionError as conn_err:
+                self.logger.error("Erro de conexão com RabbitMQ")
+                attempt += 1
+                if attempt < retries: # quantidade limitada de tentativas
+                    self.logger.info(f"Tentando novamente em {delay} segundos... ({attempt}/{retries})")
+                    time.sleep(delay)
+                else:
+                    self.logger.critical(f"Não foi possível conectar ao RabbitMQ após várias tentativas: {conn_err}", exc_info=True)
+            except ChannelError as chan_err:
+                self.logger.error(f"Erro no canal RabbitMQ: {chan_err}", exc_info=True)
+                break # tentativas devem ser somente em erros de conexão, quebra loop em outros erros
+            except AMQPError as amqp_err:
+                self.logger.error(f"Erro AMQP no RabbitMQ: {amqp_err}", exc_info=True)
+                break
+            except Exception as e:
+                self.logger.error(f"Erro inesperado ao consumir fila RabbitMQ: {e}", exc_info=True)
+                break
+            finally:
+                self.close_connection()
 
     def stop(self, channel: Any) -> None:
         try:
