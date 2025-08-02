@@ -2,3 +2,4 @@
 firmware/node_*/.pio/
 firmware/node_*/.vscode/
 firmware/node_*/.gitignore
+services/libs/__pycache__
