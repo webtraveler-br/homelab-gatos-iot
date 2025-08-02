@@ -15,7 +15,7 @@ TOXICITY_BASELINE = 1400
 TOXICITY_THRESHOLD = 300
 
 # Configuração de logging
-file_handler = setup_logging(CLIENT_ID)
+file_handler = setup_logging(CLIENT_ID, log_dir="/app/logs")
 
 
 # Handler chamado ao receber mensagem MQTT.

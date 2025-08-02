@@ -16,7 +16,7 @@ CLIENT_ID = "cat_ingestor"
 # Recebe mensagens MQTT, valida e insere logs no banco PostgreSQL.
 
 # Configuração de logging para arquivo e console
-file_handler = setup_logging(CLIENT_ID)
+file_handler = setup_logging(CLIENT_ID, log_dir="/app/logs")
 
 
 # Handler chamado ao receber mensagem MQTT.
@@ -117,7 +117,7 @@ def rabbitmq_ingestor(db_params: Dict[str, Any], config: Dict[str, Any], shutdow
 
         # Consome mensagens enquanto não houver shutdown
         while not shutdown_event.is_set():
-            rabbitmq_client.consume(config["queue"], partial(on_rabbitmq_message, db=db, config=config))
+            rabbitmq_client.consume(config["RABBITMQ_QUEUE"], partial(on_rabbitmq_message, db=db, config=config))
 
     except KeyboardInterrupt:
         logging.info("Aplicação encerrada pelo usuário.")
