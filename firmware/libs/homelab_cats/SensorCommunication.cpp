@@ -3,6 +3,8 @@
 SensorCommunication::SensorCommunication(const char* node_name) : _client(_esp_client) { // client precisa estar na lista de inicialização
     _node_name = node_name;
     strcpy(_mqtt_server_ip, "");
+    _topic_publish = nullptr;
+    _topic_subscribe = nullptr;
 }
 
 void SensorCommunication::setup_wifi(bool reset_settings) {
@@ -34,14 +36,39 @@ void SensorCommunication::setup_wifi(bool reset_settings) {
     Serial.println(_mqtt_server_ip);
 }
 
-void SensorCommunication::setup_mqtt(const char* topic_publish, int port) {
+void SensorCommunication::setup_mqtt(const char* topic_publish, int port, const char* topic_subscribe, void (*callback)(const char*, const JsonDocument&)) {
     Serial.println("Configurando MQTT...");
 
     _topic_publish = topic_publish;
     _mqtt_port = port;
+    _topic_subscribe = topic_subscribe;
+    _user_callback = callback;
     _client.setServer(_mqtt_server_ip, port);
 
+    if (_topic_subscribe) {
+        _client.setCallback([this](char* topic, byte* payload, unsigned int length) {
+            this->callback_json_wrapper(topic, payload, length);
+        });
+    }
+
     Serial.println("MQTT configurado.");
+}
+
+void SensorCommunication::callback_json_wrapper(const char* topic, const byte* payload, unsigned int length) {
+    JsonDocument cmd_doc;
+    String json_str((const char*)payload, length);
+    DeserializationError error = deserializeJson(cmd_doc, json_str);
+    if (error) {
+        Serial.print("Erro ao parsear JSON: ");
+        Serial.println(error.c_str());
+        return;
+    }
+    if (_user_callback) {
+        _user_callback(topic, cmd_doc);
+    }
+    else {
+        Serial.print("Nenhum callback definido para mensagens MQTT");
+    }
 }
 
 void SensorCommunication::reconnect() {
@@ -50,6 +77,11 @@ void SensorCommunication::reconnect() {
 
         if (_client.connect(_node_name)) {
             Serial.println("Conectado!");
+            if (_topic_subscribe) {
+                _client.subscribe(_topic_subscribe);
+                Serial.print("Inscrito no tópico: ");
+                Serial.println(_topic_subscribe);
+            }
         }
         else {
             Serial.print("Falhou, rc=");
