@@ -3,7 +3,7 @@
 
 #define NODE_NAME "node_air_quality"
 
-#define MQTT_TOPIC "sensores/nodes/air_quality"
+#define MQTT_TOPIC "sensors/nodes/air_quality"
 #define MQTT_PORT 1883
 #define PUBLISH_INTERVAL 10000
 

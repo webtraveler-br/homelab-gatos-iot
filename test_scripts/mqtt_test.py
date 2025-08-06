@@ -2,7 +2,7 @@ import paho.mqtt.client as mqtt
 
 BROKER = "192.168.1.67"
 PORT = 1883
-TOPIC = "sensores/nodes/table_presence"
+TOPIC = "sensors/nodes/table_presence"
 
 def on_message(client, userdata, message):
     print(f"Recebido no tópico '{message.topic}': {str(message.payload.decode('utf-8'))}")
