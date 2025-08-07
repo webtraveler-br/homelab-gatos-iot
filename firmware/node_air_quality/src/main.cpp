@@ -5,7 +5,7 @@
 
 #define MQTT_TOPIC "sensors/nodes/air_quality"
 #define MQTT_PORT 1883
-#define PUBLISH_INTERVAL 10000
+#define PUBLISH_INTERVAL 300000
 
 #define PIN_MQ135_SENSOR 35
 #define NUM_SAMPLES 10
@@ -35,7 +35,7 @@ void setup() {
 void loop() {
     communication.loop();
 
-    // publica em intervalos de 10 segundos
+    // publica em intervalos de 5 minutos
     unsigned long now = millis();
     if (now - last_publish >= PUBLISH_INTERVAL) {
         last_publish = now;
