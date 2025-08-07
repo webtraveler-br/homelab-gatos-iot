@@ -82,7 +82,7 @@ def mqtt_ingestor(db_params: Dict[str, Any], config: Dict[str, Any], shutdown_ev
         )
         # Loop principal com verificação do shutdown_event
         while not shutdown_event.is_set():
-            mqtt_client.connect_and_loop(timeout=1)
+            mqtt_client.connect_and_listen(timeout=1)
 
     except KeyboardInterrupt:
         logging.info("Aplicação encerrada pelo usuário.")

@@ -78,7 +78,7 @@ def main() -> None:
             client_id=CLIENT_ID,
             userdata={"rabbitmq": rabbitmq_client, "queue": config["RABBITMQ_QUEUE"]},
         )
-        mqtt_client.connect_and_loop()
+        mqtt_client.connect_and_listen()
 
     except KeyboardInterrupt:
         logging.info("Aplicação encerrada pelo usuário.")
