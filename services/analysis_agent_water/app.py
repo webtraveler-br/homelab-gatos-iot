@@ -6,20 +6,19 @@ import json
 import logging
 from typing import Any, Dict
 
-# Serviço de análise de toxicidade para mq-135 do homelab.
-# Recebe mensagens MQTT, analisa toxicidade e publica alertas no RabbitMQ.
+# Serviço de análise de falta de água para homelab.
+# Recebe mensagens MQTT, analisa distância para a água e publica alertas no RabbitMQ.
 
-CLIENT_ID = "analysis_agent_anomaly"
+CLIENT_ID = "analysis_agent_water"
 HIGH_SEVERITY = "HIGH"
-TOXICITY_BASELINE = 1400
-TOXICITY_THRESHOLD = 300
+MAX_WATER_DISTANCE = 70 # 70cm
 
 # Configuração de logging
 file_handler = setup_logging(CLIENT_ID, log_dir="/app/logs")
 
 
 # Handler chamado ao receber mensagem MQTT.
-# Se toxicidade estiver acima do limite, publica alerta no RabbitMQ.
+# Se distância estiver acima do limite, publica alerta no RabbitMQ.
 
 def on_message(client: Any, userdata: Dict[str, Any], message: Any) -> None:
     topic = message.topic
@@ -27,17 +26,17 @@ def on_message(client: Any, userdata: Dict[str, Any], message: Any) -> None:
 
     try:
         mqtt_message_json = json.loads(mqtt_message_str)
-        
-        if "toxicity" not in mqtt_message_json:
+
+        if "distance" not in mqtt_message_json:
             return
 
-        if int(mqtt_message_json["toxicity"]) > TOXICITY_BASELINE + TOXICITY_THRESHOLD:
+        if int(mqtt_message_json["distance"]) > MAX_WATER_DISTANCE:
             userdata["rabbitmq"].publish(
                 CLIENT_ID,
                 HIGH_SEVERITY,
-                "Niveis de toxicidade altos!",
+                "Água está acabando!",
                 topic,
-                mqtt_message_json["toxicity"],
+                mqtt_message_json["distance"],
                 userdata["queue"],
             )
             logging.info(f"Insight gerado e enviado ao RabbitMQ")
